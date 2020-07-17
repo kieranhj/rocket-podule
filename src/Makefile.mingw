@@ -1,0 +1,22 @@
+CPP  = g++.exe
+CC   = gcc.exe
+OBJ  = rocket.o device.o track.o
+LIBS = --no-export-all-symbols --add-stdcall-alias -lwinmm -lws2_32
+CFLAGS = $(INCS) -DBUILDING_DLL=1 -D_WIN32_WINNT=0x0501 -DDEBUG_LOG -O3 -I..\..\..\src
+
+all: rocket.dll
+
+clean:
+	rm *.o
+	rm *.dll
+
+DLLWRAP=dllwrap.exe
+DEFFILE=rocket.def
+STATICLIB=librocket.a
+
+rocket.dll: $(OBJ)
+	$(DLLWRAP) $(OBJ) $(LIBS) -o rocket.dll
+	cp rocket.dll ..
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $<
