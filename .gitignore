@@ -1,4 +1,4 @@
 
 *.o
-*.dll
+rocket.dll
 *.dmp
