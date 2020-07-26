@@ -3,6 +3,7 @@
 #endif
 
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -73,7 +74,9 @@ typedef struct rocket_podule_t
 */
 static int val_f_as_fp(float val_f)
 {
-        return val_f * (1 << 16); /* fixed point s15:16 format for now */
+        int val_sign = val_f < 0.0f ? -1 : 1;
+        int val_fp = fabs(val_f) * (1 << 16);
+        return val_fp * val_sign; /* fixed point s15:16 format for now */
 }
 
 static int track_no_from_addr(uint32_t addr)
@@ -201,6 +204,15 @@ static int rocket_sync_is_playing(void* data)
 	return rocketpod->audio_is_playing;
 }
 
+static void rocket_sync_write_key(void *data, FILE *fp, char type, int row, float value)
+{
+        rocket_podule_t *rocketpod = ((struct podule_t *)data)->p;
+        uint32_t time_and_type = (row * rocketpod->vpr) | type << 24;
+        int val_fp = val_f_as_fp(value);
+        fwrite(&time_and_type, sizeof(uint32_t), 1, fp);
+        fwrite(&val_fp, sizeof(int), 1, fp);
+}
+
 static int rocket_init(struct podule_t *podule)
 {
         FILE *f;
@@ -237,6 +249,7 @@ static int rocket_init(struct podule_t *podule)
 	rocketpod->cb.is_playing = rocket_sync_is_playing;
 	rocketpod->cb.pause = rocket_sync_pause;
 	rocketpod->cb.set_row = rocket_sync_set_row;
+        rocketpod->cb.write_key = rocket_sync_write_key;
 
 	if (sync_tcp_connect(rocketpod->device, "localhost", SYNC_DEFAULT_PORT)) 
 	{

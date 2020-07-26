@@ -306,7 +306,7 @@ void sync_destroy_device(struct sync_device *d)
 #endif
 }
 
-static int read_track_data(struct sync_device *d, struct sync_track *t)
+static int read_track_data(struct sync_device *d, struct sync_track *t, struct sync_cb *cb, void *cb_param)
 {
 	int i;
 	void *fp = d->io_cb.open(sync_track_path(d->base, t->name), "rb");
@@ -321,12 +321,15 @@ static int read_track_data(struct sync_device *d, struct sync_track *t)
 	for (i = 0; i < (int)t->num_keys; ++i) {
 		struct track_key *key = t->keys + i;
 		char type;
-		d->io_cb.read(&key->row, sizeof(int), 1, fp);
-		d->io_cb.read(&key->value, sizeof(float), 1, fp);
-		d->io_cb.read(&type, sizeof(char), 1, fp);
+		if (cb && cb->read_key) {
+			cb->read_key(cb_param, fp, &type, &key->row, &key->value);
+		} else {
+			d->io_cb.read(&key->row, sizeof(int), 1, fp);
+			d->io_cb.read(&key->value, sizeof(float), 1, fp);
+			d->io_cb.read(&type, sizeof(char), 1, fp);
+		}
 		key->type = (enum key_type)type;
 	}
-
 	d->io_cb.close(fp);
 	return 0;
 }
@@ -362,7 +365,7 @@ static int create_leading_dirs(const char *path)
 	return 0;
 }
 
-static int save_track(const struct sync_track *t, const char *path)
+static int save_track(const struct sync_track *t, const char *path, struct sync_cb *cb, void *cb_param)
 {
 	int i;
 	FILE *fp;
@@ -376,22 +379,26 @@ static int save_track(const struct sync_track *t, const char *path)
 
 	fwrite(&t->num_keys, sizeof(int), 1, fp);
 	for (i = 0; i < (int)t->num_keys; ++i) {
-		char type = (char)t->keys[i].type;
-		fwrite(&t->keys[i].row, sizeof(int), 1, fp);
-		fwrite(&t->keys[i].value, sizeof(float), 1, fp);
-		fwrite(&type, sizeof(char), 1, fp);
+		if (cb && cb->write_key) {
+			cb->write_key(cb_param, fp, t->keys[i].type, t->keys[i].row, t->keys[i].value);
+		} else {
+			char type = (char)t->keys[i].type;
+			fwrite(&t->keys[i].row, sizeof(int), 1, fp);
+			fwrite(&t->keys[i].value, sizeof(float), 1, fp);
+			fwrite(&type, sizeof(char), 1, fp);
+		}
 	}
 
 	fclose(fp);
 	return 0;
 }
 
-int sync_save_tracks(const struct sync_device *d)
+int sync_save_tracks(const struct sync_device *d, struct sync_cb *cb, void *cb_param)
 {
 	int i;
 	for (i = 0; i < (int)d->num_tracks; ++i) {
 		const struct sync_track *t = d->tracks[i];
-		if (save_track(t, sync_track_path(d->base, t->name)))
+		if (save_track(t, sync_track_path(d->base, t->name), cb, cb_param))
 			return -1;
 	}
 	return 0;
@@ -532,7 +539,7 @@ int sync_update(struct sync_device *d, int row, struct sync_cb *cb,
 				cb->pause(cb_param, flag);
 			break;
 		case SAVE_TRACKS:
-			sync_save_tracks(d);
+			sync_save_tracks(d, cb, cb_param);
 			break;
 		default:
 			fprintf(stderr, "unknown cmd: %02x\n", cmd);
@@ -605,7 +612,7 @@ const struct sync_track *sync_get_track(struct sync_device *d,
 		fetch_track_data(d, t);
 	else
 #endif
-		read_track_data(d, t);
+		read_track_data(d, t, NULL, NULL);
 
 	return t;
 }

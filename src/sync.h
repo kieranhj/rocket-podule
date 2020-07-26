@@ -10,6 +10,7 @@ extern "C" {
 #endif
 
 #include <stddef.h>
+#include <stdio.h>
 
 #ifdef __GNUC__
 #define SYNC_DEPRECATED(msg) __attribute__ ((deprecated(msg)))
@@ -30,12 +31,14 @@ struct sync_cb {
 	void (*pause)(void *, int);
 	void (*set_row)(void *, int);
 	int (*is_playing)(void *);
+	void (*write_key)(void *, FILE *, char, int, float);	/* write a key out - type, row, value */
+	void (*read_key)(void *, FILE *, char *, int *, float *);	/* read a key in - type, row, value */
 };
 #define SYNC_DEFAULT_PORT 1338
 int sync_tcp_connect(struct sync_device *, const char *, unsigned short);
 int SYNC_DEPRECATED("use sync_tcp_connect instead") sync_connect(struct sync_device *, const char *, unsigned short);
 int sync_update(struct sync_device *, int, struct sync_cb *, void *);
-int sync_save_tracks(const struct sync_device *);
+int sync_save_tracks(const struct sync_device *, struct sync_cb *, void *);
 #endif /* defined(SYNC_PLAYER) */
 
 struct sync_io_cb {
