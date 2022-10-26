@@ -1,8 +1,9 @@
+ROCKET_LIB = ../../../../emoon-rocket/external/rocket/lib
 CPP  = g++.exe
 CC   = gcc.exe
 OBJ  = rocket.o device.o track.o
 LIBS = --no-export-all-symbols --add-stdcall-alias -lws2_32
-CFLAGS = $(INCS) -DBUILDING_DLL=1 -D_WIN32_WINNT=0x0501 -DDEBUG_LOG -O3 -I..\..\..\src
+CFLAGS = $(INCS) -DBUILDING_DLL=1 -D_WIN32_WINNT=0x0501 -DDEBUG_LOG -O3 -I..\..\..\src -I$(ROCKET_LIB)
 
 all: rocket.dll
 
@@ -17,6 +18,12 @@ STATICLIB=librocket.a
 rocket.dll: $(OBJ)
 	$(DLLWRAP) $(OBJ) $(LIBS) -o rocket.dll
 	mv rocket.dll ..
+
+device.o: $(ROCKET_LIB)/device.c
+	$(CC) $(CFLAGS) -c $<
+
+track.o: $(ROCKET_LIB)/track.c
+	$(CC) $(CFLAGS) -c $<
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<

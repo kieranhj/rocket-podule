@@ -11,7 +11,7 @@
 #include <string.h>
 #include "rocket.h"
 #include "podule_api.h"
-#include "sync.h"
+#include <sync.h>
 
 #ifdef WIN32
 extern __declspec(dllexport) const podule_header_t *podule_probe(const podule_callbacks_t *callbacks, char *path);
@@ -40,6 +40,7 @@ void rocket_log(const char *format, ...)
 #ifdef DEBUG_LOG
    char buf[1024];
 //return;
+        printf("Made rocket log!\n");
    if (!rocket_logf) rocket_logf=fopen("rocket_log.txt","wt");
    va_list ap;
    va_start(ap, format);
@@ -204,11 +205,11 @@ static int rocket_sync_is_playing(void* data)
 	return rocketpod->audio_is_playing;
 }
 
-static void rocket_sync_write_key(void *data, FILE *fp, char type, int row, float value)
+static void rocket_sync_write_key(void *data, FILE *fp, char type, int row, key_value value)
 {
         rocket_podule_t *rocketpod = ((struct podule_t *)data)->p;
         uint32_t time_and_type = (row * rocketpod->vpr) | type << 24;
-        int val_fp = val_f_as_fp(value);
+        int val_fp = val_f_as_fp(value.val);
         fwrite(&time_and_type, sizeof(uint32_t), 1, fp);
         fwrite(&val_fp, sizeof(int), 1, fp);
 }
@@ -218,31 +219,35 @@ static int rocket_init(struct podule_t *podule)
         FILE *f;
         const char *track_list_fn = podule_callbacks->config_get_string(podule, "track_list", "");
 
-        f = fopen(track_list_fn, "rb");
+        rocket_log("rocket_init: Opening track list '%s'.\n", track_list_fn);
+
+        f = fopen(track_list_fn, "rt");
         if (!f)
         {
-                rocket_log("Failed to open track list '");
-                rocket_log(track_list_fn);
-                rocket_log("'\n");
+                rocket_log("rocket_init: Failed to open track list '%s'.\n", track_list_fn);
                 return -1;
         }
 
         int num_tracks = 0;
         char track_name[256];
-        while(fscanf(f, "%s", track_name) == 1)
+        int type = 0;
+        while(fscanf(f, "%s %d", track_name, &type) == 2)
         {
                 num_tracks++;
         }
+
+        rocket_log("rocket_init: Found %d tracks in list.\n", num_tracks);
 
         /* extend rocket_podule_t structure by num_tracks sync_track pointers. */
         rocket_podule_t *rocketpod = malloc(sizeof(rocket_podule_t) + num_tracks * sizeof(struct sync_track *));
         memset(rocketpod, 0, sizeof(rocket_podule_t));
 
         const char *prefix = podule_callbacks->config_get_string(podule, "prefix", "");
+	rocket_log("rocket_init: Creating Rocket device with prefix '%s'\n", prefix);
 	rocketpod->device = sync_create_device(prefix);
 	if (!rocketpod->device) 
 	{
-		rocket_log("Unable to create rocketDevice\n");
+		rocket_log("rocket_init: Unable to create Rocket device with prefix '%s'\n", prefix);
 		return -1;
 	}
 
@@ -251,17 +256,19 @@ static int rocket_init(struct podule_t *podule)
 	rocketpod->cb.set_row = rocket_sync_set_row;
         rocketpod->cb.write_key = rocket_sync_write_key;
 
+	rocket_log("rocket_init: Connecting to Rocket device on localhost at port %d\n", SYNC_DEFAULT_PORT);
 	if (sync_tcp_connect(rocketpod->device, "localhost", SYNC_DEFAULT_PORT)) 
 	{
-		rocket_log("Rocket failed to connect\n");
+		rocket_log("rocket_init: Failed to connect to Rocket device on localhost at port %d\n", SYNC_DEFAULT_PORT);
 		return -1;
 	}
 
         fseek(f, 0, SEEK_SET);
         int i = 0;
-        while(fscanf(f, "%s", track_name) == 1)
+        while(fscanf(f, "%s %d", track_name, &type) == 2)
         {
-                rocketpod->s_tracks[i++] = sync_get_track(rocketpod->device, track_name);
+		rocket_log("rocket_init: Getting track [%d] named '%s' with type %d\n", i, track_name, type);
+                rocketpod->s_tracks[i++] = sync_get_track(rocketpod->device, track_name, type);
         }
         fclose(f);
         assert(i == num_tracks);
@@ -271,7 +278,8 @@ static int rocket_init(struct podule_t *podule)
         rocketpod->vpr = speed > 0 ? speed : 4;
         rocketpod->podule = podule;
         podule->p = rocketpod;
-        
+
+	rocket_log("rocket_init: Completed init with speed %d vsyncs per row\n", rocketpod->vpr);
         return 0;
 }
 
