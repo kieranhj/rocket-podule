@@ -11,7 +11,7 @@
 #include <string.h>
 #include "rocket.h"
 #include "podule_api.h"
-#include <sync.h>
+#include "sync.h"
 
 #ifdef WIN32
 extern __declspec(dllexport) const podule_header_t *podule_probe(const podule_callbacks_t *callbacks, char *path);
@@ -109,9 +109,26 @@ static uint8_t rocket_read_b(struct podule_t *podule, podule_io_type type, uint3
 
         float row = row_from_vsyncs(rocketpod->vsyncs, rocketpod->vpr);
 
-        int val_fp = val_f_as_fp(sync_get_val(rocketpod->s_tracks[track_no], row));
-        int val_hw = (addr & 4) ? (val_fp >> 16) : (val_fp & 0xffff);
+        int val_fp = 0;
 
+        switch(rocketpod->s_tracks[track_no]->type)
+        {
+                case TRACK_FLOAT:
+                default:
+                        val_fp = val_f_as_fp(sync_get_val(rocketpod->s_tracks[track_no], row));
+                        break;
+
+                case TRACK_EVENT:
+                        val_fp = sync_get_event(rocketpod->s_tracks[track_no], row);
+                        break;
+
+                case TRACK_COLOUR:
+                        val_fp = sync_get_colour(rocketpod->s_tracks[track_no], row);
+                        break;
+        }
+ 
+        int val_hw = (addr & 4) ? (val_fp >> 16) : (val_fp & 0xffff);
+ 
         /* return individual byte */
         return (val_hw >> (8 * (addr&1))) & 0xff;
 }
@@ -134,7 +151,23 @@ static uint16_t rocket_read_w(struct podule_t *podule, podule_io_type type, uint
         }
 
         float row = row_from_vsyncs(rocketpod->vsyncs, rocketpod->vpr);
-        int val_fp = val_f_as_fp(sync_get_val(rocketpod->s_tracks[track_no], row));
+        int val_fp = 0;
+
+        switch(rocketpod->s_tracks[track_no]->type)
+        {
+                case TRACK_FLOAT:
+                default:
+                        val_fp = val_f_as_fp(sync_get_val(rocketpod->s_tracks[track_no], row));
+                        break;
+
+                case TRACK_EVENT:
+                        val_fp = sync_get_event(rocketpod->s_tracks[track_no], row);
+                        break;
+
+                case TRACK_COLOUR:
+                        val_fp = sync_get_colour(rocketpod->s_tracks[track_no], row);
+                        break;
+        }
 
         /* return hi word or lo word */
         return (addr & 4) ? (val_fp >> 16) : (val_fp & 0xffff);
