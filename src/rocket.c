@@ -383,7 +383,7 @@ static podule_config_t rocket_config =
 static const podule_header_t rocket_podule_header =
 {
         .version = PODULE_API_VERSION,
-        .flags = PODULE_FLAGS_UNIQUE,
+        .flags = PODULE_FLAGS_UNIQUE | PODULE_FLAGS_8BIT,
         .short_name = "rocket",
         .name = "Rocket Sync Tracker",
         .functions =
