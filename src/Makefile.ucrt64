@@ -1,0 +1,23 @@
+# 64-bit build for the current Arculator (MSYS2 UCRT64 gcc). Run from the UCRT64 shell:
+#   make -f Makefile.ucrt64
+# ROCKET_LIB is the sync library from the Rocket editor checkout (kieranhj/emoon-rocket).
+ROCKET_LIB ?= ../../../../emoon-rocket/external/rocket/lib
+CC = gcc
+CFLAGS = -DBUILDING_DLL=1 -DDEBUG_LOG -O2 -std=gnu17 -I../../../src -I$(ROCKET_LIB)
+
+all: ../rocket.dll
+
+../rocket.dll: rocket64.o device64.o track64.o
+	$(CC) -shared -s -static-libgcc -o $@ $^ -lws2_32
+
+rocket64.o: rocket.c rocket.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+device64.o: $(ROCKET_LIB)/device.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+track64.o: $(ROCKET_LIB)/track.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -f rocket64.o device64.o track64.o
